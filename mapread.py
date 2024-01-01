@@ -89,6 +89,8 @@ try:
 			# 400 402 405 406 422 427
 			# 587 59A 59B 59E 59F
 			#readRs(0x400, 0x4B+1)
+			#readRs(0x400, 0x80)
+
 			readRs(0x400, 0x27+1)
 			readRs(0x587, 0x18+1)
 			#readRs(0x1B6, 1)
@@ -111,9 +113,16 @@ try:
 			#Начиная с версии 26.6. 16-ти битные ячейки мощности аналогичные 8 битным PNET и PLoad но в 8 раз точнее:
 			#PLoad_8=0x59E-0x59F - текущая мощность нагрузки в киловатах/10 и *8
 			map_PLOAD = (((regs[0x59F] << 8) | regs[0x59E]) / 8 ) * 100
-			#Для режима заряда - инвертируем
-			if map_MODE != 4:
+			
+			map_IACC = regs[0x408] * 2
+			map_UACC = (regs[0x405] * 256 + regs[0x406])/10
+
+			#Для режима заряда - считаем через ток и напряжение по АКБ. Иначе инвертируем
+			if map_MODE == 4:
+				map_PLOAD = map_IACC * map_UACC
+			else:
 				map_PLOAD = 0 - map_PLOAD;
+
 			#Начиная с версии 26.6. 16-ти битные ячейки мощности аналогичные 8 битным PNET и PLoad но в 8 раз точнее:
 			#PNET_8=0x59A-0x59B  - текущая мощность сети в киловатах/10 и *8, знак определяется по PNET_Sign_P=0x587.
 			map_PNET = (((regs[0x59B] << 8) | regs[0x59A]) / 8 ) * 100
@@ -123,7 +132,6 @@ try:
 			if regs[0x587] == 0:
 				map_PNET = 0 - map_PNET
 
-			map_UACC = (regs[0x405] * 256 + regs[0x406])/10
 			
 			map_P_MPPT = 0 #TODO Доделать как придут из ремонта MPPT контроллеры
 			
@@ -152,10 +160,11 @@ try:
 			jsq = jsq + "\n," + "\"UNET\":" + "\"" + str(map_UNET) + "\""
 			jsq = jsq + "\n," + "\"UOUT\":" + "\"" + str(map_UOUT) + "\""
 			jsq = jsq + "\n," + "\"UACC\":" + "\"" + str(map_UACC) + "\""
+			jsq = jsq + "\n," + "\"IACC\":" + "\"" + str(map_IACC) + "\""
 
 			jsq = jsq + "}"
 			
-			print("jsq=" + jsq)
+			#print("jsq=" + jsq)
 
 			jjsq = json.loads(jsq)
 			#conn = http.HTTPConnection('localhost')
@@ -168,40 +177,3 @@ try:
 			print("Read error: " + readError)
 except Exception as e:
 	print(str(e))
-
-				#v_TotalEnergy   = ((regs[0]*65536) + regs[1])/100
-				#v_ExportEnergy  = ((regs[8]*65536) + regs[9])/100
-				#v_ImportEnergy  = ((regs[10]*65536) + regs[11])/100
-				#v_Voltage       = (regs[12])/10
-				#v_Current       = (regs[13])/100
-				#v_ActivePower   = toSigned(regs[14],2)
-				#v_ReActivePower = toSigned(regs[15],2)
-				#v_PowerFactor   = regs[16]/1000
-				#v_Frequency     = regs[17]/100
-				
-				#jsq = jsq + "," + "\"ObjType\":\"EnergyMeter\""
-				#jsq = jsq + "," + "\"TotalEnergy\":" +    str(v_TotalEnergy)
-				#jsq = jsq + "," + "\"ExportEnergy\":" +   str(v_ExportEnergy)
-				#jsq = jsq + "," + "\"ImportEnergy\":" +   str(v_ImportEnergy)
-				#jsq = jsq + "," + "\"Voltage\":" +        str(v_Voltage)
-				#jsq = jsq + "," + "\"Current\":" +        str(v_Current)
-				#jsq = jsq + "," + "\"ActibePower\":" +    str(v_ActivePower)
-				#jsq = jsq + "," + "\"ReActibePower\":" +  str(v_ReActivePower)
-				#jsq = jsq + "," + "\"PowerFactor\":" +    str(v_PowerFactor)
-				#jsq = jsq + "," + "\"Frequency\":" +      str(v_Frequency)
-
-#		regsA = []
-#
-#		for bpart in range(6):
-#			for mpart in range(4):
-#				if bpart > 1 and bpart < 4:
-#					regsA.extend([0] * 0x40)
-#				else:
-#					if not readError:
-#						regs = c.read_holding_registers(0x0 + (bpart*mpart*0x40), 0x40)
-#						if regs:
-#							regsA.extend(regs)
-#						else:
-#							readError = True
-#
-#		print(regsA)
