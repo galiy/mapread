@@ -91,7 +91,7 @@ try:
 			#readRs(0x400, 0x4B+1)
 			#readRs(0x400, 0x80)
 
-			readRs(0x400, 0x27+1)
+			readRs(0x400, 0x33+1)
 			readRs(0x587, 0x18+1)
 			#readRs(0x1B6, 1)
 
@@ -114,18 +114,25 @@ try:
 			#PLoad_8=0x59E-0x59F - текущая мощность нагрузки в киловатах/10 и *8
 			map_PLOAD = (((regs[0x59F] << 8) | regs[0x59E]) / 8 ) * 100
 			
-			map_IACC = regs[0x408] * 2
+
+			#_IAcc_med_A_u16_L=0x432, _IAcc_med_A_u16_H=0x433 - Более точное значение тока по АКБ (аналогичное _IAcc_med_A_2), для подсчета статистики.
+			#Iакб(А) = (IAcc_med_A_u16_L+ IAcc_med_A_u16_H*256)/16
+			#map_IACC = regs[0x408] * 2
+			map_IACC = (regs[0x432] + regs[0x433] * 256)/16
+
+
 			map_UACC = (regs[0x405] * 256 + regs[0x406])/10
 
 			#Для режима заряда - считаем через ток и напряжение по АКБ. Иначе инвертируем
 			if map_MODE == 4:
-				map_PLOAD = map_IACC * map_UACC
+				map_PLOAD = round(map_IACC * map_UACC)
 			else:
+				map_IACC = 0 - map_IACC;
 				map_PLOAD = 0 - map_PLOAD;
 
 			#Начиная с версии 26.6. 16-ти битные ячейки мощности аналогичные 8 битным PNET и PLoad но в 8 раз точнее:
 			#PNET_8=0x59A-0x59B  - текущая мощность сети в киловатах/10 и *8, знак определяется по PNET_Sign_P=0x587.
-			map_PNET = (((regs[0x59B] << 8) | regs[0x59A]) / 8 ) * 100
+			map_PNET = round((((regs[0x59B] << 8) | regs[0x59A]) / 8 ) * 100)
 
 			#PNET_Sign_P=0x587 
 			#знак мощности сети: 1 – положительная, 0 - отрицательная мощность (продажа)
@@ -139,6 +146,15 @@ try:
 			#UNET=0 – нет сети на входе иначе Uсети(В)=UNET+100
 			map_UNET = regs[0x422] + 100
 			
+			#_INET=0x423 - Ток отбираемый от сети, в том числе на заряд.
+			#Iсети(A)= INET.
+			map_INET = regs[0x423]
+			map_INET_16_4 = regs[0x431]
+			if map_INET < 16:
+				map_INET_16_4 = map_INET_16_4 / 16
+			else:
+				map_INET_16_4 = map_INET_16_4 / 4
+
 			#_UOUTmed=0x427 – Напряжение на выходе во время генерации
 			#UOUTmed=0 – нет сети на входе иначе Uвыход(В)=UOUTmed +100.
 			map_UOUT = regs[0x427] + 100
@@ -161,6 +177,8 @@ try:
 			jsq = jsq + "\n," + "\"UOUT\":" + "\"" + str(map_UOUT) + "\""
 			jsq = jsq + "\n," + "\"UACC\":" + "\"" + str(map_UACC) + "\""
 			jsq = jsq + "\n," + "\"IACC\":" + "\"" + str(map_IACC) + "\""
+			jsq = jsq + "\n," + "\"INET\":" + "\"" + str(map_INET) + "\""
+			jsq = jsq + "\n," + "\"INET_16_4\":" + "\"" + str(map_INET_16_4) + "\""
 
 			jsq = jsq + "}"
 			
